@@ -6,6 +6,8 @@ copy of the game to extract assets from.
 > [!NOTE]
 > The project targets the Japanese version, and other versions might be supported later.
 
+This game was released with its source code, this project **do not** publish it. Symbol names might be used (exactly like using a symbol map file) but the code itself will be recreated as mentioned above.
+
 ## How to install
 See [INSTALL.md](INSTALL.md) for instructions on how to install the project.
 
