@@ -2735,7 +2735,7 @@ data_02091410 kind:data(any) addr:0x02091410
 data_02091414 kind:data(any) addr:0x02091414
 data_0209141c kind:data(any) addr:0x0209141c
 data_02091424 kind:data(any) addr:0x02091424
-data_0209143c kind:data(any) addr:0x0209143c
+g_pack_data_info kind:data(any) addr:0x0209143c
 data_020920a8 kind:data(any) addr:0x020920a8
 data_02093654 kind:data(any) addr:0x02093654
 data_0209648c kind:data(any) addr:0x0209648c
