@@ -29,8 +29,8 @@ GAME = "pm4"
 DSD_VERSION = 'v0.10.0'
 WIBO_VERSION = '0.6.16'
 OBJDIFF_VERSION = 'v3.0.0-beta.6'
-MWCC_VERSION = "1.2/sp2"
-DECOMP_ME_COMPILER = "mwcc_20_79"
+MWCC_VERSION = "2.0/sp1p5"
+DECOMP_ME_COMPILER = "mwcc_30_131"
 CC_FLAGS = " ".join([
     "-O4,p",                # Optimize maximally for performance
     "-enum int",            # Use int-sized enums
@@ -40,7 +40,7 @@ CC_FLAGS = " ".join([
     "-gccext,on",           # Enable GCC extensions
     "-fp soft",             # Compute float operations in software
     "-inline noauto",       # Inline only functions marked with 'inline'
-    "-lang=c++",            # Set language to C++
+    "-lang=c",              # Set language to C
     "-Cpp_exceptions off",  # Disable C++ exceptions
     "-RTTI off",            # Disable runtime type information
     "-interworking",        # Enable ARM/Thumb interworking
