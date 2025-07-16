@@ -7,3 +7,6 @@
 src/main.c:
     complete
     .text start:0x02000c04 end:0x02000c28
+
+src/bds_lib.c:
+    .text start:0x02000c28 end:0x02009d70
