@@ -12,6 +12,8 @@ from get_platform import get_platform
 # Runs `dsd sig new` on all functions from a `symbols.txt` file.
 # Example of usage: `python tools/gen_signatures.py -i -o 61 eur` to get data for overlay 61's symbols.
 # Place this file in a subfolder from your project (for instance `tools`)
+#
+# From https://gist.github.com/Yanis002/fe6ad6de4b043f2744d82bbb560cdcbe
 
 
 INDENT = " " * 4
