@@ -1,9 +1,15 @@
+#include "global.h"
 #include "types.h"
 
+static bool g_tp_touch_before;
+static bool g_backup_ready;
+static bool g_backup_used;
+
+//! TODO: move to header or remove when more things are matched
 extern void execBefore();
 extern void execAfter();
 extern void func_02000d44();
-extern void func_02000d68();
+extern void execSleepCheck();
 extern void initInterrupt();
 extern void func_02000de4();
 extern void func_02001074();
@@ -11,7 +17,7 @@ extern void func_02001148();
 extern void func_020011c8();
 extern void func_020011f4();
 extern void initVRAM();
-extern void func_020015c8();
+extern void execVRAM();
 extern void func_02001634();
 extern void func_02001660();
 extern void func_02001b24();
@@ -50,7 +56,7 @@ extern void func_02004d58();
 extern void func_02004db8();
 extern void func_02004e44();
 extern void func_02004f04();
-extern void func_02004ff8();
+extern void execFadeBlend();
 extern void func_02005098();
 extern void func_020052c4();
 extern void func_02005394();
@@ -74,7 +80,7 @@ extern void func_020062f8();
 extern void func_02006370();
 extern void initPad();
 extern void func_02006418();
-extern void func_02006450();
+extern void execPad();
 extern void func_02006700();
 extern void func_02006710();
 extern void func_02006720();
@@ -99,7 +105,7 @@ extern void func_02007568();
 extern void func_02007594();
 extern void func_020075b4();
 extern void initFileSystem();
-extern void func_02007670();
+extern void execFileSystem();
 extern void func_02007674();
 extern void func_02007718();
 extern void func_02007810();
@@ -121,7 +127,7 @@ extern void initSound();
 extern void func_020082f8();
 extern void func_02008320();
 extern void func_02008340();
-extern void func_0200836c();
+extern void execSound();
 extern void func_020084c0();
 extern void func_02008588();
 extern void func_02008664();
@@ -153,7 +159,7 @@ extern void func_02008f14();
 extern void func_02008f20();
 extern void func_020093d8();
 extern void initMovie();
-extern void func_020095e8();
+extern void execMovie();
 extern void func_02009614();
 extern void func_02009644();
 extern void func_0200975c();
@@ -161,18 +167,19 @@ extern void func_0200976c();
 extern void func_0200977c();
 extern void func_0200978c();
 extern void initRandom();
-extern void func_02009858();
+extern void getRandom();
 extern void initCard();
 extern void func_020099d8();
 extern void func_02009a44();
 extern void func_02009b84();
 extern void func_02009cdc();
 extern void getNowTime();
-
+extern void *mallocBDS(unk32);
 #define POWER_CNT (*(u16 *) 0x04000304)
+#define REG_A_DISPCNT (*(u32 *) 0x04000000)
 #define REG_B_DISPCNT (*(u32 *) 0x04001000)
 #define REG_IME (*(u16 *) 0x04000208)
-
+#define REG_PAD (*(u16 *) 0x027FFFA8)
 #define GX_SetPower()            \
     {                            \
         POWER_CNT &= 0xFFFFFDF1; \
@@ -185,6 +192,14 @@ extern void getNowTime();
     {                  \
         REG_IME = 1;   \
     }
+#define PAD_DetectFold() ((REG_PAD & 0x8000) >> 1)
+typedef struct UnkStruct_g_raster_req {
+    /* 0x00 */ unk16 unk_00;
+    /* 0x02 */ unk16 unk_02;
+    /* 0x04 */ unk32 unk_04[2];
+} UnkStruct_g_raster_req;
+UnkStruct_g_raster_req g_raster_req[0x20];
+u8 g_raster_stop[0x20];
 
 static s32 *g_pack_data_info_adrs;
 
@@ -220,18 +235,212 @@ void initBDS(s32 *in_pack_data_info) {
     OS_WaitVBlankIntr();
 }
 
-void execBefore() {}
-void execAfter() {}
+void execBefore() {
+    execSleepCheck();
+    execPad();
+    execFileSystem();
+    execSound();
+    execMovie();
+    execFadeBlend();
+}
+
+void execAfter() {
+    execVRAM();
+    getRandom();
+    OS_WaitVBlankIntr();
+}
+
 void func_02000d44() {}
-void func_02000d68() {}
-void initInterrupt() {}
+
+// non-matching
+void execSleepCheck() {
+    if (PAD_DetectFold() == 0) {
+        return;
+    }
+
+    if (!g_backup_ready || !g_backup_used) {
+        PM_GoSleepMode(0xC, 0, 0);
+    }
+}
+
+void initInterrupt() {
+    s32 i;
+
+    for (i = 0; i < 0x20; i++) {
+        g_raster_req[i].unk_00 = 0;
+        g_raster_stop[i]       = 0;
+    }
+}
+
 void func_02000de4() {}
 void func_02001074() {}
 void func_02001148() {}
 void func_020011c8() {}
 void func_020011f4() {}
-void initVRAM() {}
-void func_020015c8() {}
+
+extern unk32 g_mutex;
+extern u8 g_vram_use[9];
+extern unk32 g_main_plane;
+extern unk32 g_sub_plane;
+extern unk32 g_main_bg_vram;
+extern unk32 g_main_obj_vram;
+extern unk8 g_bg_mode[2];
+extern unk8 g_bg_scr_size[8];
+extern unk8 g_bg_col_mode[8];
+extern unk8 g_bg_cg_block[8];
+extern unk8 g_bg_scr_block[8];
+extern unk32 g_bg_area_over[8];
+extern unk32 g_bg_x[8];
+extern unk32 g_bg_y[8];
+extern unk8 g_bg_prio[8];
+extern unk8 g_bg_prio_req[8];
+extern unk8 g_main_plane_req;
+extern unk8 g_sub_plane_req;
+extern unk8 g_main_oam[0x400];
+extern unk8 g_sub_oam[0x400];
+extern unk32 g_trans_oam[2];
+extern unk16 g_fade_use[4];
+extern unk8 g_fade_req[4];
+extern unk32 g_fade_count[4];
+extern unk32 g_fade_now[4];
+extern void *g_fade_pal[8];
+extern unk16 g_bmp_font_color[3];
+
+#define GX_SetDispSelect(value) \
+    {                           \
+        POWER_CNT &= (value);   \
+    }
+
+#define REG_BG0 (*(u16 *) 0x04000008)
+#define REG_BG1 (*(u16 *) 0x0400000A)
+#define REG_BG2 (*(u16 *) 0x0400000C)
+#define REG_BG3 (*(u16 *) 0x0400000E)
+#define REG_BG0 (*(u16 *) 0x04001008)
+#define REG_BG1 (*(u16 *) 0x0400100A)
+#define REG_BG2 (*(u16 *) 0x0400100C)
+#define REG_BG3 (*(u16 *) 0x0400100E)
+
+#define G2_SetBG0Priority(value)     \
+    {                                \
+        REG_BG0 &= 0xFFFC | (value); \
+    }
+#define G2_SetBG1Priority(value)     \
+    {                                \
+        REG_BG1 &= 0xFFFC | (value); \
+    }
+#define G2_SetBG2Priority(value)     \
+    {                                \
+        REG_BG2 &= 0xFFFC | (value); \
+    }
+#define G2_SetBG3Priority(value)     \
+    {                                \
+        REG_BG3 &= 0xFFFC | (value); \
+    }
+#define G2S_SetBG0Priority(value)    \
+    {                                \
+        REG_BG0 &= 0xFFFC | (value); \
+    }
+#define G2S_SetBG1Priority(value)    \
+    {                                \
+        REG_BG1 &= 0xFFFC | (value); \
+    }
+#define G2S_SetBG2Priority(value)    \
+    {                                \
+        REG_BG2 &= 0xFFFC | (value); \
+    }
+#define G2S_SetBG3Priority(value)    \
+    {                                \
+        REG_BG3 &= 0xFFFC | (value); \
+    }
+#define GX_SetOBJVRamModeChar(value)           \
+    {                                          \
+        REG_A_DISPCNT &= 0xFFCFFFEF | (value); \
+    }
+#define GXS_SetOBJVRamModeChar(value)          \
+    {                                          \
+        REG_B_DISPCNT &= 0xFFCFFFEF | (value); \
+    }
+
+void initVRAM() {
+    s32 i;
+
+    OS_InitMutex(&g_mutex);
+    GX_SetDispSelect(0x7FFF);
+    GX_SetBankForLCDC(0x1FF);
+    func_0206db68(0, 0x6800000, 0xA4000);
+    GX_DisableBankForLCDC();
+    func_0206db68(0xC0, 0x7000000, 0x400);
+    func_0206db68(0, 0x5000000, 0x400);
+    func_0206db68(0xC0, 0x7000400, 0x400);
+    func_0206db68(0, 0x5000400, 0x400);
+
+    for (i = 0; i < ARRAY_LEN(g_vram_use); i++) {
+        g_vram_use[i] = 0;
+    }
+
+    g_main_plane = 0;
+    g_sub_plane  = 0;
+    REG_B_DISPCNT &= 0xFFFFE0FF;
+    REG_A_DISPCNT &= 0xC0FFE0FF;
+    g_main_bg_vram  = 0;
+    g_main_obj_vram = 0;
+    GX_SetBankForBG(0);
+    GX_SetBankForOBJ(0);
+    GX_SetBankForSubBG(0);
+    GX_SetBankForSubOBJ(0);
+    g_bg_mode[0] = 0;
+    g_bg_mode[1] = 0;
+    GX_SetGraphicsMode(1, 0, 0);
+    GXS_SetGraphicsMode(0);
+
+    for (i = 0; i < 8; i++) {
+        g_bg_scr_size[i]  = 0;
+        g_bg_col_mode[i]  = 0;
+        g_bg_cg_block[i]  = 0;
+        g_bg_scr_block[i] = 0;
+        g_bg_area_over[i] = 0;
+        g_bg_x[i]         = 0;
+        g_bg_y[i]         = 0;
+        g_bg_prio[i]      = i % 4;
+        g_bg_prio_req[i]  = 0xFF;
+    }
+
+    setBGControl(0xFF);
+    setBgPos(0xFF, 0, 0);
+    G2_SetBG0Priority(0);
+    G2_SetBG1Priority(1);
+    G2_SetBG2Priority(2);
+    G2_SetBG3Priority(3);
+    G2S_SetBG0Priority(0);
+    G2S_SetBG1Priority(1);
+    G2S_SetBG2Priority(2);
+    G2S_SetBG3Priority(3);
+    g_main_plane_req = 0;
+    g_sub_plane_req  = 0;
+    MI_DmaFill32(3, g_main_oam, 0xC0, sizeof(g_main_oam));
+    MI_DmaFill32(3, g_sub_oam, 0xC0, sizeof(g_sub_oam));
+    g_trans_oam[0] = 0;
+    g_trans_oam[1] = 0;
+    GX_SetOBJVRamModeChar(0x10);
+    GXS_SetOBJVRamModeChar(0x10);
+
+    for (i = 0; i < 4; i++) {
+        g_fade_use[i]   = 0xFFFF;
+        g_fade_req[i]   = 0;
+        g_fade_count[i] = 0xFFFFFFFF;
+        g_fade_now[i]   = 0x20;
+    }
+
+    for (i = 0; i < ARRAY_LEN(g_fade_pal); i++) {
+        g_fade_pal[i] = mallocBDS(0x200);
+    }
+
+    g_bmp_font_color[0] = 0;
+    g_bmp_font_color[1] = 0xFFFF;
+    g_bmp_font_color[2] = 0x8000;
+}
+
+void execVRAM() {}
 void func_02001634() {}
 void func_02001660() {}
 void func_02001b24() {}
@@ -270,7 +479,7 @@ void func_02004d58() {}
 void func_02004db8() {}
 void func_02004e44() {}
 void func_02004f04() {}
-void func_02004ff8() {}
+void execFadeBlend() {}
 void func_02005098() {}
 void func_020052c4() {}
 void func_02005394() {}
@@ -294,7 +503,7 @@ void func_020062f8() {}
 void func_02006370() {}
 void initPad() {}
 void func_02006418() {}
-void func_02006450() {}
+void execPad() {}
 void func_02006700() {}
 void func_02006710() {}
 void func_02006720() {}
@@ -319,7 +528,7 @@ void func_02007568() {}
 void func_02007594() {}
 void func_020075b4() {}
 void initFileSystem() {}
-void func_02007670() {}
+void execFileSystem() {}
 void func_02007674() {}
 void func_02007718() {}
 void func_02007810() {}
@@ -341,7 +550,7 @@ void initSound() {}
 void func_020082f8() {}
 void func_02008320() {}
 void func_02008340() {}
-void func_0200836c() {}
+void execSound() {}
 void func_020084c0() {}
 void func_02008588() {}
 void func_02008664() {}
@@ -373,7 +582,7 @@ void func_02008f14() {}
 void func_02008f20() {}
 void func_020093d8() {}
 void initMovie() {}
-void func_020095e8() {}
+void execMovie() {}
 void func_02009614() {}
 void func_02009644() {}
 void func_0200975c() {}
@@ -381,7 +590,7 @@ void func_0200976c() {}
 void func_0200977c() {}
 void func_0200978c() {}
 void initRandom() {}
-void func_02009858() {}
+void getRandom() {}
 void initCard() {}
 void func_020099d8() {}
 void func_02009a44() {}
