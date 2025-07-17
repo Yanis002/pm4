@@ -26,7 +26,7 @@ args = parser.parse_args()
 
 # Config
 GAME = "pm4"
-DSD_VERSION = 'v0.10.0'
+DSD_VERSION = 'v0.10.1'
 WIBO_VERSION = '0.6.16'
 OBJDIFF_VERSION = 'v3.0.0-beta.6'
 MWCC_VERSION = "2.0/sp1p5"
